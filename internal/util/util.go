@@ -18,6 +18,7 @@ package util
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -177,6 +178,11 @@ func GetVolumeSnapshotContentForVolumeSnapshot(volSnap *snapshotv1api.VolumeSnap
 			log.Infof("Waiting for volumesnapshotcontents %s to have snapshot handle. Retrying in %ds", snapshotContent.Name, interval/time.Second)
 			if snapshotContent.Status != nil && snapshotContent.Status.Error != nil {
 				log.Warnf("Volumesnapshotcontent %s has error: %v", snapshotContent.Name, *snapshotContent.Status.Error.Message)
+				// we will not poll for the cases where the error is non-retryable
+				snapshotContentErrMessage, _ := json.Marshal(*snapshotContent.Status.Error.Message)
+				if strings.Contains(string(snapshotContentErrMessage), "PremiumV2 disks") || strings.Contains(string(snapshotContentErrMessage), "SnapshotsLimitReached") {
+					return true, errors.Errorf("%s", string(snapshotContentErrMessage))
+				}
 			}
 			return false, nil
 		}
